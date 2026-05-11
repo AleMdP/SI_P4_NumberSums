@@ -37,5 +37,5 @@ Para el resultado, escribir el mismo tablero, sustituyendo los valores que sobra
 7 . 6 13 ; . 5 . 5 ; . . 7 7 ; 7 5 13
 ````
 ## Localizaciones de archivos del problema
-El fichero tableros.txt encontrado en el src son los problemas propuestos por el profesor en la página [tableros.txt](http://opendatalab.uhu.es/aplicaciones/2026si/descargas/tableros.txt)
-> El fichero soluciones.txt contiene las soluciones a estos problemas
+El fichero [tableros.txt](P04_SatisfaccionDeRestricciones/src/tableros.txt) encontrado en el src son los problemas propuestos por el profesor en la página [tableros.txt](http://opendatalab.uhu.es/aplicaciones/2026si/descargas/tableros.txt)
+> El fichero [soluciones.txt](P04_SatisfaccionDeRestricciones/src/soluciones.txt) contiene las soluciones a estos problemas
