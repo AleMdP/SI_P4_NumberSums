@@ -1,21 +1,26 @@
 package si2026.alejandrodelpozoalu.p05;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.util.*;
 
 public class Practica_04 {
 
     static int n;
     static int[][] tablero;
+
     static int[] sumaFilasObjetivo;
     static int[] sumaColumnasObjetivo;
 
-    static boolean[][] seleccionados;
+    static int[] sumaFilasActual;
+    static int[] sumaColumnasActual;
+    
+    static int[][] sumaFilasRestante;
+    static int[][] sumaColumnasRestante;
+
+    static Variable[][] variables;
 
     public static void main(String[] args) {
+
         String ficheroEntrada = "./src/tableros.txt";
         String ficheroSalida = "./src/soluciones.txt";
 
@@ -26,78 +31,85 @@ public class Practica_04 {
 
             while ((linea = br.readLine()) != null) {
                 cargarTablero(linea);
+                inicializarVariables();
 
-                seleccionados = new boolean[n][n];
+                AC3 ac3 = new AC3();
+                ac3.ejecutar(variables);
 
-                int[] sumaFilasActual = new int[n];
-                int[] sumaColumnasActual = new int[n];
+                boolean solucion = backtracking(0, 0);
 
-                boolean solucion = resolver(0, 0, sumaFilasActual, sumaColumnasActual);
+                if (solucion) bw.write(obtenerSolucion());
+                else bw.write("Sin solucion");
 
-                if (solucion) {
-                    String solucionTexto = obtenerSolucionFormatoTexto();
-                    bw.write(solucionTexto);
-                    bw.newLine();
-                } else {
-                    bw.write("Sin solucion");
-                    bw.newLine();
-                }
+                bw.newLine();
             }
 
-            System.out.println("Soluciones guardadas en soluciones.txt");
-
-        } catch (IOException e) {
-            System.out.println("Error con los ficheros");
+            System.out.println("Soluciones generadas");
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     static void cargarTablero(String entrada) {
-
         String[] partes = entrada.split(";");
-
         n = partes.length - 1;
 
         tablero = new int[n][n];
-
         sumaFilasObjetivo = new int[n];
         sumaColumnasObjetivo = new int[n];
+        
+        sumaFilasActual = new int[n];
+        sumaColumnasActual = new int[n];
+        
+        sumaFilasRestante = new int[n][n];
+        sumaColumnasRestante = new int[n][n];
 
-        // Leer filas
         for (int fila = 0; fila < n; fila++) {
-
-            String[] numeros = partes[fila].trim().split("\\s+");
+            String[] numeros = partes[fila].trim().split("\\s+"); // \\s+ representa uno o más espacios en blanco
 
             for (int columna = 0; columna < n; columna++) {
                 tablero[fila][columna] = Integer.parseInt(numeros[columna]);
             }
-
             sumaFilasObjetivo[fila] = Integer.parseInt(numeros[n]);
         }
 
-        // Leer sumas columnas
         String[] columnas = partes[n].trim().split("\\s+");
-
         for (int columna = 0; columna < n; columna++) {
             sumaColumnasObjetivo[columna] = Integer.parseInt(columnas[columna]);
         }
-    }
 
-    static boolean resolver(int fila, int columna, int[] sumaFilasActual, int[] sumaColumnasActual) {
-        // Caso final
-        if (fila == n) {
-            for (int i = 0; i < n; i++) {
-                if (sumaFilasActual[i] != sumaFilasObjetivo[i]) return false;
+        // Precalcular la suma máxima que queda disponible hacia la derecha y hacia abajo
+        for (int fila = 0; fila < n; fila++) {
+            int acumulado = 0;
+            for (int columna = n - 1; columna >= 0; columna--) {
+                acumulado += tablero[fila][columna];
+                sumaFilasRestante[fila][columna] = acumulado;
             }
-
-            for (int j = 0; j < n; j++) {
-                if (sumaColumnasActual[j] != sumaColumnasObjetivo[j]) return false;
-            }
-
-            return true;
         }
 
-        // Siguiente posición
+        for (int columna = 0; columna < n; columna++) {
+            int acumulado = 0;
+            for (int fila = n - 1; fila >= 0; fila--) {
+                acumulado += tablero[fila][columna];
+                sumaColumnasRestante[fila][columna] = acumulado;
+            }
+        }
+    }
+
+    static void inicializarVariables() {
+        variables = new Variable[n][n];
+        for (int fila = 0; fila < n; fila++) {
+            for (int columna = 0; columna < n; columna++) {
+                variables[fila][columna] = new Variable(fila, columna);
+            }
+        }
+    }
+
+    static boolean backtracking(int fila, int columna) {
+        if (fila == n) {
+            return true; 
+        }
+
         int siguienteFila = fila;
         int siguienteColumna = columna + 1;
 
@@ -106,62 +118,117 @@ public class Practica_04 {
             siguienteFila++;
         }
 
-        int valor = tablero[fila][columna];
+        Variable variable = variables[fila][columna];
 
-        // OPCIÓN 1 -> seleccionar el valor
-        if (sumaFilasActual[fila] + valor <= sumaFilasObjetivo[fila] && sumaColumnasActual[columna] + valor <= sumaColumnasObjetivo[columna]) {
-            seleccionados[fila][columna] = true;
+        for (Integer valor : variable.dominio) {
+            variable.valor = valor;
 
-            sumaFilasActual[fila] += valor;
-            sumaColumnasActual[columna] += valor;
+            int valorSumado = (valor == 1) ? tablero[fila][columna] : 0;
+            sumaFilasActual[fila] += valorSumado;
+            sumaColumnasActual[columna] += valorSumado;
 
-            if (resolver(siguienteFila, siguienteColumna, sumaFilasActual, sumaColumnasActual)) return true;
+            // Forward Checking
+            if (esConsistenteParcial(fila, columna)) {
+                if (backtracking(siguienteFila, siguienteColumna)) {
+                    return true;
+                }
+            }
 
-            // Backtracking
-            sumaFilasActual[fila] -= valor;
-            sumaColumnasActual[columna] -= valor;
+            // Backtrackin
+            sumaFilasActual[fila] -= valorSumado;
+            sumaColumnasActual[columna] -= valorSumado;
+            variable.valor = -1;
         }
-
-        // OPCIÓN 2 -> no seleccionar el valor
-        seleccionados[fila][columna] = false;
-
-        if (resolver(siguienteFila, siguienteColumna, sumaFilasActual, sumaColumnasActual)) return true;
 
         return false;
     }
 
-    static String obtenerSolucionFormatoTexto() {
-        StringBuilder sb = new StringBuilder();
+    static boolean esConsistenteParcial(int fila, int columna) {
+        // Suma actual supera el objetivo; podar
+        if (sumaFilasActual[fila] > sumaFilasObjetivo[fila]) return false;
+        if (sumaColumnasActual[columna] > sumaColumnasObjetivo[columna]) return false;
 
-        // Filas
+        // Final de una fila; la suma tiene que ser igual a la del objetivo
+        if (columna == n - 1) {
+            if (sumaFilasActual[fila] != sumaFilasObjetivo[fila]) return false;
+        } else {
+            // Forward checking: Verificamos si con lo que queda disponible en la fila se puede alcanzar el objetivo
+            int maximoPosibleFila = sumaFilasActual[fila] + sumaFilasRestante[fila][columna + 1];
+            if (maximoPosibleFila < sumaFilasObjetivo[fila]) return false;
+        }
+
+        // Final de una columna; la suma tiene que ser igual a la del objetivo
+        if (fila == n - 1) {
+            if (sumaColumnasActual[columna] != sumaColumnasObjetivo[columna]) return false;
+        } else {
+            // Forward checking otra vez
+            int maximoPosibleColumna = sumaColumnasActual[columna] + sumaColumnasRestante[fila + 1][columna];
+            if (maximoPosibleColumna < sumaColumnasObjetivo[columna]) return false;
+        }
+
+        return true;
+    }
+
+    static String obtenerSolucion() {
+        StringBuilder sb = new StringBuilder();
         for (int fila = 0; fila < n; fila++) {
             for (int columna = 0; columna < n; columna++) {
-                if (seleccionados[fila][columna]) {
-                    sb.append(tablero[fila][columna]);
-                } else {
-                    sb.append(".");
-                }
-
+                if (variables[fila][columna].valor == 1) sb.append(tablero[fila][columna]);
+                else sb.append(".");
                 sb.append(" ");
             }
-
             sb.append(sumaFilasObjetivo[fila]);
-
-            if (fila < n - 1) {
-                sb.append(" ; ");
-            }
-        }
-
-        // Última fila
-        sb.append(" ; ");
-
-        for (int columna = 0; columna < n; columna++) {
-            sb.append(sumaColumnasObjetivo[columna]);
-            if (columna < n - 1) {
-                sb.append(" ");
-            }
+            sb.append(" ; ");
         }
         
+        for (int columna = 0; columna < n; columna++) {
+            sb.append(sumaColumnasObjetivo[columna]);
+            if (columna < n - 1) sb.append(" ");
+        }
         return sb.toString();
+    }
+}
+
+class Variable {
+    int fila;
+    int columna;
+    int valor;
+    List<Integer> dominio;
+
+    Variable(int fila, int columna) {
+        this.fila = fila;
+        this.columna = columna;
+        valor = -1;
+        dominio = new ArrayList<>();
+        dominio.add(0); // No incluir número
+        dominio.add(1); // Incluir número
+    }
+}
+
+class Arco {
+    Variable origen;
+    Variable destino;
+
+    Arco(Variable origen, Variable destino) {
+        this.origen = origen;
+        this.destino = destino;
+    }
+}
+
+/**
+ * AC3: Si un valor individual del tablero supera por sí mismo el objetivo de la fila o columna,
+ * el valor '1' se elimina inmediatamente del dominio de esa variable antes de buscar.
+ */
+class AC3 {
+    void ejecutar(Variable[][] variables) {
+        int n = variables.length;
+        for (int f = 0; f < n; f++) {
+            for (int c = 0; c < n; c++) {
+                if (Practica_04.tablero[f][c] > Practica_04.sumaFilasObjetivo[f] || 
+                    Practica_04.tablero[f][c] > Practica_04.sumaColumnasObjetivo[c]) {
+                    variables[f][c].dominio.remove(Integer.valueOf(1)); 
+                }
+            }
+        }
     }
 }
